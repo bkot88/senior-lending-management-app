@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Test</title>
+	<script src='js/jquery-3.3.1.min.js'></script>
+</head>
+<body>
+<table>
+	<thead>
+		<tr>
+			<th>First Name</th>
+			<th>Surname</th>
+			<th>Button</th>
+		</tr>		
+	</thead>
+		<tr>
+			<td id="firstName">Hello</td>
+			<td id="surname">World</td>
+			<td>
+				<button class='confirm'>Confirm</button>
+			</td>
+		</tr>
+		<tr>
+			<td id="firstName">World</td>
+			<td id="surname">Hello</td>
+			<td>
+				<button class='confirm'>Confirm</button>
+			</td>
+		</tr>
+	<tbody>
+		
+	</tbody>
+</table>
+
+<script>
+$(document).ready(function () {
+	$('.confirm').click(function () {
+		// var text = $(this).text();
+		// var firstName = $(this).parent().siblings('#firstName').text();
+		// var surname = $(this).parent().siblings('#surname').text();
+		// console.log(firstName);
+		// console.log(surname);
+		console.log('button click!');
+	});
+});
+</script>
+
+</body>
+</html>

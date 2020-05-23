@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+</head>
+
+<body>
+
+	<nav id=navMenu>
+	</nav>
+
+	<div class="container-fluid">
+		<form id="transactionForm" class="form-horizontal">
+
+			<div class="form-group">
+				<label class="col-sm-1" for="facilityName">Facility*:</label>
+				<div class="col-sm-11">
+					<select type="text" class="form-control" id="facilityName" name="facilityName" onchange="onFacilitySelect();"></select>
+				</div>
+			</div>
+
+		</form>
+	</div>
+
+	<div class="container-fluid">
+		<div class="panel-group">
+
+			<div class="panel panel-default">
+				<div class="panel-heading"><h4>Facility Summary</h4></div>
+				<div class="panel-body" id="summaryContent">select facility above</div>
+			</div>
+
+			<div class="panel panel-default">
+				<div class="panel-heading"><h4>Calculations</h4></div>
+				<div class="panel-body" id="facilityCalculations">
+					<table class="table table-striped">
+						<thead id="calculationHeader"></thead>
+						<tbody id="calculationBody"></tbody>
+					</table>
+				</div>
+			</div>
+
+			<div class="panel panel-default">
+				<div class="panel-heading"><h4>Pending</h4></div>
+				<div class="panel-body" id="pendingTransactions">
+					<table class="table table-striped">
+						<thead id="pendingHeader"></thead>
+						<tbody id="pendingBody"></tbody>
+					</table>
+				</div>
+			</div>
+
+			<div class="panel panel-default">
+				<div class="panel-heading"><h4>Facility Transactions</h4></div>
+				<div class="panel-body" id="facilityTransactions">
+					<table class="table table-striped">
+						<thead id="transactionHeader"></thead>
+						<tbody id="transactionBody"></tbody>
+					</table>
+				</div>
+			</div>
+
+		</div>
+	</div>
+
+	<script src="js/jquery-3.3.1.min.js"></script>
+	<script src="js/pouchdb-6.4.3.min.js"></script>
+	<script src="js/utils.js"></script>
+
+	<script>
+		// populate options in the form above
+		(function () {
+			var db = PouchDB(dbUrl + 'deals');
+			insertSelectOptions(db, 'facilityName');
+		}) ();
+	</script>
+
+	<script>
+		function logTransaction(transaction, table, facility, balance) {
+			table.addRow([
+				transaction.transactionDate,
+				transaction.transactionAction,
+				transaction.transactionParty,
+				transaction.transactionDesc,
+				Number(transaction.transactionValue).toFixed(2).toLocaleString(),
+				Number(balance).toFixed(2).toLocaleString(),
+				Number(facility - balance).toFixed(2).toLocaleString()]);
+		}
+
+		function logCalculation(
+				table, prevDate, curDate, trigger, diffDays,
+				prevBalance, currentRate, interest, lineRate, lineFee) {
+			table.addRow([
+				prevDate.toLocaleDateString('en-AUS'),
+				curDate.toLocaleDateString('en-AUS'),
+				trigger,
+				diffDays,
+				Number(prevBalance).toFixed(2).toLocaleString(),
+				currentRate / 100.0,
+				Number(interest).toFixed(2).toLocaleString(),
+				lineRate / 100.0,
+				Number(lineFee).toFixed(2).toLocaleString()]);
+		}
+
+		function periodEndTransaction(facilityName, tDate) {
+			return {
+				'_id': '\(' + facilityName + ',Period End,' + tDate + '\)',
+				'transactionFacility': facilityName,
+				'transactionDate': tDate,
+				'transactionParty': 'Facility Event',
+				'transactionAction': 'Period End',
+				'transactionDesc': '',
+				'transactionValue': 0.0,
+				'transactionAttachment': '',
+				transactionKey: [facilityName, 'Period End', tDate]
+			};
+		}
+
+		function makePeriodEndTransactions(deal) {
+			var periodEndTransactions = [];
+			
+			var dealStartDate = new Date(deal.dealStartDate);
+			var today = new Date();
+			// console.log(dealStartDate, dealStartDate.getMonth(), dealStartDate.getFullYear());
+			var dateRange = startOfMonthRange(dealStartDate, today);
+
+			// make period end transactions
+			for (var i in dateRange) {
+				var tDate = formatDate(dateRange[i]);
+				var t = periodEndTransaction(deal.facilityName, tDate);
+				// console.log(t);
+				periodEndTransactions.push(t);
+			}
+			// make a transaction for today
+			var t = periodEndTransaction(deal.facilityName, formatDate(today));
+			periodEndTransactions.push(t);
+			
+			return periodEndTransactions;
+		}
+
+		function performCalculations(deal, transactions) {
+			// sort transactions by date order
+			var periodEnds = makePeriodEndTransactions(deal);
+			for (var i in periodEnds) {
+				transactions.push({'doc': periodEnds[i]});
+			}
+
+			// add a position to all transactions to achieve a stable sort!
+			for (var i in transactions) {
+				transactions[i].position = Number(i);
+			}
+
+			transactions.sort(function (a, b) {
+				var keyA = a.doc.transactionDate;
+				var keyB = b.doc.transactionDate;
+				if(keyA < keyB) return -1;
+				if(keyA > keyB) return 1;
+				// force Period End to be first in ascending order
+				if(a.doc.transactionAction == 'Period End') return -1;
+				if(b.doc.transactionAction == 'Period End') return 1;
+				// maintain a stable sort
+				if(a.position < b.position) return -1;
+				if(a.position > b.position) return 1;
+				return 0;
+			});
+			console.log(transactions);
+
+			var transactionTable = new Table('transactionHeader', 'transactionBody');
+			var calculationTable = new Table('calculationHeader', 'calculationBody');
+			// populate transaction table header
+			transactionTable.addHeader([
+				'Date', 'Action', 'Party',
+				'Description', 'Value', 'Balance',
+				'Undrawn Balance']);
+
+			calculationTable.addHeader([
+				'From Date', 'To Date', 'Trigger', 'Days',
+				'Balance', 'Interest Rate', 'Interest', 'Line Rate', 'Line Fee']);
+
+			// populate transaction table rows
+			var balance = 0;
+			var compoundBalance = 0;
+			var facility = 0;
+			var accruedInterest = 0;
+			var currentRate = 0;
+			var lastDate = null;
+			var prevBalance = 0;
+			var lineFee = 0;
+
+			var monthYearTotals = {};
+
+			// iterate through each transaction
+			for (var i = 0; i < transactions.length; i++) {
+				transaction = transactions[i].doc;
+				console.log(transaction);
+				console.log('calculating transaction...');
+
+				if(transaction.transactionAction == 'Change in Facility Size') {
+					facility += transaction.transactionValue;
+				}
+
+				// deal with borrower transactions
+				if(transaction.transactionParty == 'Borrower') {
+					if(transaction.transactionAction == 'Payment of Principle') {
+						balance += transaction.transactionValue;
+						compoundBalance += transaction.transactionValue;
+					}
+					if(transaction.transactionAction == 'Receipt of Principle') {
+						balance -= transaction.transactionValue;
+						compoundBalance += transaction.transactionValue;
+					}
+				}
+
+				if(transaction.transactionAction == 'Interest Charge') {
+					balance += transaction.transactionValue;
+				}
+
+				if(transaction.transactionAction == 'Line Fee Charge') {
+					balance += transaction.transactionValue;
+				}
+
+				if(lastDate != null) {
+					var prevDate = new Date(lastDate);
+					var curDate = new Date(transaction.transactionDate);
+					var diffDays = daysBetweenDates(prevDate, curDate);
+
+					var interest = currentRate / 100 * diffDays / 365 * prevBalance;
+					var lineFeeCharge = lineFee / 100 * (facility - prevBalance) * diffDays / 365;
+										
+					if (transaction.transactionAction == 'Period End') {
+						compoundBalance += interest;
+						compoundBalance += lineFeeCharge;
+						accruedInterest += interest;
+					}
+
+					// add totals to dictionary
+					var monthYearKey = formatDate(prevDate).slice(0, 7);
+					if (monthYearKey in monthYearTotals) {
+						monthYearTotals[monthYearKey].interest += interest;
+						monthYearTotals[monthYearKey].lineFee += lineFeeCharge;
+					}
+					else {
+						monthYearTotals[monthYearKey] = {
+							'interest': interest,
+							'lineFee': lineFeeCharge};
+					}
+
+					logCalculation(calculationTable, prevDate, curDate,
+						transaction.transactionAction, diffDays,
+						prevBalance, currentRate, interest, lineFee, lineFeeCharge);
+				}
+				prevBalance = compoundBalance;
+				lastDate = transaction.transactionDate;
+
+				if(transaction.transactionAction == 'Change in Interest Rate') {
+					currentRate = transaction.transactionValue;
+				}
+
+				if(transaction.transactionAction == 'Change in Line Fee') {
+					lineFee = transaction.transactionValue;
+				}
+
+				if (transaction.transactionAction != 'Period End') {
+					logTransaction(transaction, transactionTable, facility, balance)
+				}
+			}
+
+			// console.log(monthYearTotals);
+			return monthYearTotals;
+		}
+
+		function onFacilitySelect() {
+			console.log('facilitySummary()...');
+			var formData = $('#facilityName').serializeArray()[0];
+			// console.log(formData);
+
+			docId = formData.value;
+			var deal = null;
+			var periodEndTransactions = [];
+			var pendingTransactions = [];
+
+			new Promise(function(resolve, reject) {
+				resolve();
+			}).then(function() {
+				// retrieve and retrieve end of period transactions
+				var db = PouchDB(dbUrl + 'deals');
+				return db.get(docId);
+			}).then(function(doc) {
+				// print caluclations and transactions to page
+				$('#summaryContent').empty();
+				$('#summaryContent').append('<pre>' + JSON.stringify(doc, null, 2) + '</pre>');
+				deal = doc;
+				console.log(deal);
+				// now retrieve all transactions and return a promise
+				var db = PouchDB(dbUrl + 'transactions');
+				return db.query('index/by_facility', {
+					key: docId,
+					include_docs: true
+				})
+			}).then(function(result) {
+				// display transactions
+				var transactions = result.rows;
+				console.log('processing transactions!!!');
+				// print calculations
+				var totals = performCalculations(deal, transactions);
+				return {'totals': totals, 'transactions': transactions};
+			}).then(function (result) {
+				console.log(result);
+				var transactions = result.transactions;
+				// index ids in db
+				var idsInDb = {};
+				for (var key in transactions) {
+					var tempId = transactions[key].id;
+					idsInDb[tempId] = true;
+				}
+				console.log(idsInDb);
+
+				var totals = result.totals;
+				// append pending calculations to pending table
+				var pendingTable = new Table('pendingHeader', 'pendingBody');
+				pendingTable.addHeader([
+					'Period', 'Interest', 'Line Fee',
+					'Charge Date', 'Confirm']);
+				for (var key in totals) {
+					var chargeDate = new Date(key);
+					chargeDate.setMonth(chargeDate.getMonth() + 1);
+					var isInFuture = (new Date()) < chargeDate;
+					chargeDate = formatDate(chargeDate);
+					var dbId = '\(' + deal.facilityName + ',Interest Charge,' + chargeDate +'\)';
+					var button = '<button class="approveButton">Approve</button>';
+					if(dbId in idsInDb) button = 'Approved';
+					if(isInFuture) button = 'Current Period';
+					pendingTable.addRow([
+						{'text': key, 'id': 'period'},
+						{
+							'text': Number(totals[key].interest.toFixed(2).toLocaleString()),
+							'id': 'interest'
+						},
+						{
+							'text': Number(totals[key].lineFee.toFixed(2).toLocaleString()),
+							'id': 'lineFee'
+						},
+						{'text': chargeDate, 'id': 'chargeDate'},
+						button]);
+				}
+			});
+		}
+	</script>
+
+	<script>
+		$(document).ready(function () {
+			$('#pendingTransactions').on('click', '.approveButton', function () {
+				var period = $(this).parent().siblings('#period').text();
+				var interest = $(this).parent().siblings('#interest').text();
+				var lineFee = $(this).parent().siblings('#lineFee').text();
+				var chargeDate = $(this).parent().siblings('#chargeDate').text();
+				
+				var curDate = new Date();
+				var tDate = new Date(chargeDate);
+				if(tDate > curDate) {
+					alert('Approving a transaction in the future is prohibited!'); 
+					return;
+				}
+
+				// get facilityName				
+				var formData = $('#facilityName').serializeArray()[0];
+				var facilityName = formData.value;
+				console.log([facilityName, period, interest, lineFee, chargeDate]);
+
+				// create interest trasnaction
+				var interestTransaction = {
+					'_id': '\(' + facilityName + ',' + 'Interest Charge,' + chargeDate + '\)',
+					'transactionFacility': facilityName,
+					'transactionDate': chargeDate,
+					'transactionParty': 'Auto',
+					'transactionAction': 'Interest Charge',
+					'transactionDesc': 'Approved',
+					'transactionValue': Number(interest),
+					'transactionAttachment': '',
+					'transactionKey': [facilityName, 'Interest Charge', chargeDate],
+					'status': 'Approved'
+				};
+				var lineFeeTransaction = {
+					'_id': '\(' + facilityName + ',' + 'Line Fee Charge,' + chargeDate + '\)',
+					'transactionFacility': facilityName,
+					'transactionDate': chargeDate,
+					'transactionParty': 'Auto',
+					'transactionAction': 'Line Fee Charge',
+					'transactionDesc': 'Approved',
+					'transactionValue': Number(lineFee),
+					'transactionAttachment': '',
+					'transactionKey': [facilityName, 'Line Fee Charge', chargeDate],
+					'status': 'Approved'
+				};
+
+				console.log(interestTransaction);
+				var db = PouchDB(dbUrl + 'transactions');
+				var p1 = db.put(interestTransaction).then(function (result) {
+					console.log(result);
+				}).catch(function (err) {
+					alert(JSON.stringify(err));
+				});
+				
+				console.log(lineFeeTransaction);
+				var p2 = db.put(lineFeeTransaction).then(function (result) {
+					console.log(result);
+				}).catch(function (err) {
+					alert(JSON.stringify(err));
+				});
+
+				console.log(p1);
+				console.log(p2);
+				Promise.all([p1, p2]).then(function () {
+					// refresh calculations and transactions!
+					onFacilitySelect();
+				});
+			});
+		});
+	</script>
+
+</body>
+
+</html>

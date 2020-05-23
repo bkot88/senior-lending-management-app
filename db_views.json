@@ -1,0 +1,13 @@
+{
+  "_id": "_design/index",
+  "_rev": "10-de85edc2e79bc3ca07476e3c2bf678b7",
+  "views": {
+    "by_facility": {
+      "map": "function (doc) {\n  emit(doc.transactionFacility, 1);\n}"
+    },
+    "by_periodend": {
+      "map": "function (doc) {\n  if (doc.transactionAction == 'Period End')\n    emit([doc.transactionFacility, doc.transactionDate], null);\n}"
+    }
+  },
+  "language": "javascript"
+}

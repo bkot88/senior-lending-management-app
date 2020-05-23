@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+</head>
+
+<body>
+
+	<nav id=navMenu>
+	</nav>
+
+	<div class="container-fluid">
+		<h1>Welcome to Richard's App</h1>
+		<p id="dbCheck"></p>
+	</div>
+
+	<script src="js/jquery-3.3.1.min.js"></script>
+	<script src="js/pouchdb-6.4.3.min.js"></script>
+	<script src="js/utils.js"></script>
+
+	<script>
+		(function () {
+			$('#dbCheck').empty();
+			// $('#dbCheck').append('Trying to connect to DB (' + dbUrl + ').<br>');
+			$.get(dbUrl, function (data) {
+				// console.log(data);
+				$('#dbCheck').append("CouchDB found! App should work as expected.<br><br>");
+				// regex to find IP address in dbUrl
+				var dbIp = dbUrl.match(/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{4}/gi);
+				// console.log(dbIp);
+				$('#dbCheck').append('Visit <a href="http://' + dbIp + '/_utils/">link to DB</a> to view records in the DB. ');
+				$('#dbCheck').append('Log in with details in email.');
+			}).fail(function (err) {
+				console.log(err);
+				$('#dbCheck').append("Error, CouchDB not found!");
+			});
+		})();
+	</script>
+
+</body>
+
+</html>

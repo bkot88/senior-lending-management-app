@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+</head>
+
+<body>
+
+  <nav id=navMenu>
+  </nav>
+
+  <!-- only edit here!!! -->
+  <script src="js/jquery-3.3.1.min.js"></script>
+  <script src="js/pouchdb-6.4.3.min.js"></script>
+  <script src="js/utils.js"></script>
+  <script>
+    var dbName = "investors";
+    var inputFields = [
+      "investorName", "investorAcn", "contactFirstName",
+      "contactSurname", "contactEmail", "contactPhone", "contactMobile",
+      "investorBank", "bankAddress", "investorBsb", "bankAccount"];
+    var inputNames = [
+      "Investor Name", "Investor ACN", "Contact First Name",
+      "Contact Surname", "Contact Email", "Contact Phone", "Contact Mobile",
+      "Investor Bank", "Bank Address", "Investor BSB", "Bank Account"];
+    var keyField = "investorName";
+    var db = PouchDB(dbUrl + dbName);
+  </script>
+  <!-- do not edit below this!!! -->
+
+  <!-- add fields to the form -->
+  <div class="container-fluid">
+    <form class="form-horizontal" action="/action_page.php">
+
+      <script>
+        for (var i = 0; i < inputFields.length; i++) {
+          insertFormInput(inputNames[i], inputFields[i], "...");
+        }
+      </script>
+
+      <div class="form-group">
+        <div class="col-sm-offset-2 col-sm-10">
+          <button type="button" class="btn btn-default" onclick="insertIntoDb(db, inputFields, keyField)">Submit</button>
+        </div>
+      </div>
+
+    </form>
+  </div>
+
+</body>
+
+</html>

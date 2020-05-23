@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+</head>
+
+<body>
+
+	<nav id=navMenu>
+	</nav>
+
+	<div class="container-fluid">
+		<form id="dealsForm" class="form-horizontal">
+
+			<div class="form-group">
+				<label for="facilityName">Facility Name:</label>
+				<div class="col-sm-10">
+					<input type="text" class="form-control" id="facilityName" name="facilityName"></select>
+				</div>
+			</div>
+
+			<div class="form-group">
+				<label for="dealBorrower">Borrower:</label>
+				<div class="col-sm-10">
+					<select class="form-control" id="dealBorrower" name="dealBorrower"></select>
+				</div>
+			</div>
+
+			<div class="form-group">
+				<label for="compoundOption">Compound Option:</label>
+				<div class="col-sm-10">
+					<select class="form-control" id="compoundOption" name="compoundOption">
+						<option disabled selected value>Select an Option</option>
+						<option>Monthly</option>
+						<option>Quarterly</option>
+						<option>Semi Annual</option>
+						<option>Annual</option>
+					</select>
+				</div>
+			</div>
+
+			<div class="form-group">
+				<label for="dealDate">Date:</label>
+				<div class="col-sm-10">
+					<input type="date" class="form-control" id="dealDate" name="dealDate">
+					</input>
+				</div>
+			</div>
+
+			<div class="form-group">
+				<label for="dealInterestRate">Interest Rate:</label>
+				<div class="col-sm-10">
+					<input type="number" class="form-control" id="dealInterestRate" name="dealInterestRate" min="0" max="100" step="0.01">
+					</input>
+				</div>
+			</div>
+
+			<div class="form-group">
+				<label for="dealDefaultRate">Default Rate:</label>
+				<div class="col-sm-10">
+					<input type="number" class="form-control" id="dealDefaultRate" name="dealDefaultRate" min="0" max="100" step="0.01">
+					</input>
+				</div>
+			</div>
+
+			<div class="form-group">
+				<label for="dealLineFee">Line Fee:</label>
+				<div class="col-sm-10">
+					<input type="number" class="form-control" id="dealLineFee" name="dealLineFee" min="0" max="100" step="0.01">
+					</input>
+				</div>
+			</div>
+
+			<div class="form-group">
+				<label for="dealEstabFee">Establishment Fee:</label>
+				<div class="col-sm-10">
+					<input type="number" class="form-control" id="dealEstabFee" name="dealEstabFee" min="0" max="100" step="0.01">
+					</input>
+				</div>
+			</div>
+
+			<div class="form-group">
+				<label for="dealOtherFee">Other Fee:</label>
+				<div class="col-sm-10">
+					<input type="number" class="form-control" id="dealOtherFee" name="dealOtherFee" min="0" max="100" step="0.01">
+					</input>
+				</div>
+			</div>
+
+			<div class="form-group">
+				<label for="dealManager">Manager:</label>
+				<div class="col-sm-10">
+					<select class="form-control" id="dealManager" name="dealManager"></select>
+				</div>
+			</div>
+
+			<div class="form-group">
+				<label for="dealMngrInterestFee">Mngr Interest Fee:</label>
+				<div class="col-sm-10">
+					<input type="number" class="form-control" id="dealMngrInterestFee" name="dealMngrInterestFee" min="0" max="100" step="0.01">
+					</input>
+				</div>
+			</div>
+
+			<div class="form-group">
+				<label for="dealMngrLineFee">Mngr Line Fee:</label>
+				<div class="col-sm-10">
+					<input type="number" class="form-control" id="dealMngrLineFee" name="dealMngrLineFee" min="0" max="100" step="0.01">
+					</input>
+				</div>
+			</div>
+
+			<div class="form-group">
+				<label for="dealMngrEstabFee">Mngr Establishment Fee:</label>
+				<div class="col-sm-10">
+					<input type="number" class="form-control" id="dealMngrEstabFee" name="dealMngrEstabFee" min="0" max="100" step="0.01">
+					</input>
+				</div>
+			</div>
+
+			<div class="form-group">
+				<label for="dealMngrOtherFee">Mngr Other Fee:</label>
+				<div class="col-sm-10">
+					<input type="number" class="form-control" id="dealMngrOtherFee" name="dealMngrOtherFee" min="0" max="100" step="0.01">
+					</input>
+				</div>
+			</div>
+
+			<div class="form-group">
+				<label for="dealTxnDocumentation">Txn Documentation #todo:</label>
+				<div class="col-sm-10">
+					<input type="text" class="form-control" id="dealTxnDocumentation" name="dealTxnDocumentation">
+					</input>
+				</div>
+			</div>
+
+			<div class="form-group">
+				<div class="col-sm-offset-2 col-sm-10">
+					<button type="button" class="btn btn-default" onclick="submitDealsForm()">Submit</button>
+				</div>
+			</div>
+
+		</form>
+	</div>
+
+	<script src="js/jquery-3.3.1.min.js"></script>
+	<script src="js/pouchdb-6.4.3.min.js"></script>
+	<script src="js/utils.js"></script>
+
+	<script>
+	function submitDealsForm() {
+		console.log('submitDealsForm()...');
+		var formData = $('#dealsForm').serializeArray();
+		// console.log(formData);
+		var doc = {};
+		for (var i = 0; i < formData.length; i++) {
+			var field = formData[i].name;
+			var val = formData[i].value;
+			doc[field] = val;
+		}
+		// console.log(doc);
+		// create a db connection and post/put the doc
+		doc._id = formData[0].value;
+
+		doc.dealInterestRate = parseFloat(doc.dealInterestRate);
+		doc.dealDefaultRate = parseFloat(doc.dealDefaultRate);
+		doc.dealLineFee = parseFloat(doc.dealLineFee);
+		doc.dealEstabFee = parseFloat(doc.dealEstabFee);
+		doc.dealOtherFee = parseFloat(doc.dealOtherFee);
+
+		doc.dealMngrInterestFee = parseFloat(doc.dealMngrInterestFee);
+		doc.dealMngrLineFee = parseFloat(doc.dealMngrLineFee);
+		doc.dealMngrEstabFee = parseFloat(doc.dealMngrEstabFee);
+		doc.dealMngrOtherFee = parseFloat(doc.dealMngrOtherFee);
+
+		var db = PouchDB(dbUrl + 'deals');
+		db.post(doc).then(function (result) {
+			console.log(result);
+			alert(JSON.stringify(result));
+		}).catch(function (err) {
+			console.log(err);
+		});
+	}
+	</script>
+
+	<script>
+		(function () {
+			var db = PouchDB(dbUrl + 'borrowers');
+			insertSelectOptions(db, 'dealBorrower');
+			var db = PouchDB(dbUrl + 'managers');
+			insertSelectOptions(db, 'dealManager');
+		})();
+	</script>
+
+</body>
+
+</html>
